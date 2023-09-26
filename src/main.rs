@@ -21,24 +21,6 @@ struct DeviceInfo {
     services_resolved: bool,
 }
 
-// async fn query_device(adapter: &Adapter, addr: Address) -> bluer::Result<()> {
-//     let device = adapter.device(addr)?;
-//     println!("    Address type:       {}", device.address_type().await?);
-//     println!("    Name:               {:?}", device.name().await?);
-//     println!("    Icon:               {:?}", device.icon().await?);
-//     println!("    Class:              {:?}", device.class().await?);
-//     println!("    UUIDs:              {:?}", device.uuids().await?.unwrap_or_default());
-//     println!("    Paired:             {:?}", device.is_paired().await?);
-//     println!("    Connected:          {:?}", device.is_connected().await?);
-//     println!("    Trusted:            {:?}", device.is_trusted().await?);
-//     println!("    Modalias:           {:?}", device.modalias().await?);
-//     println!("    RSSI:               {:?}", device.rssi().await?);
-//     println!("    TX power:           {:?}", device.tx_power().await?);
-//     println!("    Manufacturer data:  {:?}", device.manufacturer_data().await?);
-//     println!("    Service data:       {:?}", device.service_data().await?);
-//     Ok(())
-// }
-
 async fn query_all_device_properties(adapter: &Adapter, addr: Address) -> bluer::Result<()> {
     let device = adapter.device(addr)?;
     let props = device.all_properties().await?;
@@ -55,12 +37,13 @@ async fn main() -> bluer::Result<()> {
     // MQTT Config
     let host = env::var("MQTT_HOST").unwrap_or("localhost".to_string());
     let port = env::var("MQTT_PORT").unwrap_or("1883".to_string());
+    let client_id = env::var("MQTT_CLIENT_ID").unwrap_or("eddystone".to_string());
     let username = env::var("MQTT_USERNAME").unwrap_or("".to_string());
     let password = env::var("MQTT_PASSWORD").unwrap_or("".to_string());
 
     let create_options = mqtt::CreateOptionsBuilder::new()
         .server_uri(&format!("{}:{}", host, port))
-        .client_id("rust-mqtt")
+        .client_id(client_id)
         .finalize();
 
     let connect_options = mqtt::ConnectOptionsBuilder::new()
@@ -77,6 +60,8 @@ async fn main() -> bluer::Result<()> {
         println!("Failed to connect to MQTT server: {}", e);
         return Ok(());
     }
+
+    println!("{}", &format!("Connected to mqtt://{}:{}", host, port));
 
     // BLE Config
     let filter_addr: HashSet<Address> = env::args().filter_map(|arg| arg.parse::<Address>().ok()).collect();
@@ -109,8 +94,6 @@ async fn main() -> bluer::Result<()> {
                         query_all_device_properties(&adapter, addr).await?;
 
                         let payload = adapter.device(addr)?.all_properties().await?;
-
-                        //parse payload to object
                         let json_payload = serde_json::to_string(&payload).unwrap();
 
                         let msg_content = format!("{:?}", json_payload);
